@@ -1,0 +1,40 @@
+# Development files
+*.log
+*.tgz
+node_modules
+.DS_Store
+
+# Build files
+dist
+build
+.wxt
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+
+# Test files
+test
+tests
+*.test.ts
+*.spec.ts
+
+# Documentation source
+docs
+
+# Git files
+.git
+.gitignore
+
+# CI files
+.github
+.gitlab-ci.yml
+
+# Examples
+examples
+
+# TypeScript
+tsconfig.json
+tsconfig.*.json
