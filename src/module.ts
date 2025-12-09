@@ -1,10 +1,9 @@
 import { relative } from 'node:path'
-import chokidar from 'chokidar'
 import pc from 'picocolors'
-import 'wxt'
 import { defineWxtModule } from 'wxt/modules'
-import { makeLogger, plural, type LogLevel } from '@davestewart/wxt-utils'
+import { makeLogger, plural,type LogLevel } from '@davestewart/wxt-utils'
 import { filesToRoutes, type RouteDefinition, routesToCode } from './router/routes'
+import 'wxt'
 import { getPageFiles, getPagesDirs, PagesDirInfo } from './router/fs'
 import { type PagesDriver, vueDriver } from './drivers'
 
@@ -39,6 +38,7 @@ export const module = defineWxtModule<PagesModuleOptions>({
     const driver = options.driver || vueDriver()
     const watch = options.watch !== false // default to true
     const srcDir = wxt.config.srcDir
+    const root = wxt.config.root
 
     // logging
     const Logger = makeLogger(wxt.logger, 'pages', options.logLevel)
@@ -117,7 +117,7 @@ export const module = defineWxtModule<PagesModuleOptions>({
 
       // scopes
       for (const { path, scope } of pagesInfos) {
-        const rel = relative(srcDir, path)
+        const rel = relative(root, path)
         const scopeLabel = scope === 'global'
           ? pc.dim('(global)')
           : pc.cyan(`@${scope}`)
@@ -214,17 +214,17 @@ ${code}
       })
     })
 
-    // simple router for virtual module paths
-    function parseRoute (path: string): { path: string } | null {
-      const [id, ...segments] = path.split('/')
-      if (id === MODULE_ID) {
-        return { path: segments.join('/') }
-      }
-      return null
-    }
-
     // create virtual module plugin
     function createVitePlugin () {
+      // simple router for virtual module paths
+      function parseRoute (path: string): { path: string } | null {
+        const [id, ...segments] = path.split('/')
+        if (id === MODULE_ID) {
+          return { path: segments.join('/') }
+        }
+        return null
+      }
+
       return {
         name: 'wxt-module-pages',
 
@@ -236,6 +236,7 @@ ${code}
             return '\0' + id
           }
         },
+
         async load (id: string) {
           const route = parseRoute(id)
           if (route) {
@@ -296,87 +297,76 @@ ${code}
 
         // add watcher plugin if watch is enabled
         if (watch) {
-          // store watcher instance
-          let watcher: any = null
-
           config.plugins.push({
             name: 'wxt-module-pages-watcher-helper',
             configureServer (server: any) {
-              Logger.debug('Vite server ready, starting file watcher...')
+              Logger.debug('Vite server ready, configuring file watcher...')
 
+              // add watch paths to Vite's watcher
               const watchPaths = pagesInfos.map(({ path }) => path)
-
-              const watcher = chokidar.watch(watchPaths, {
-                ignoreInitial: true,
-                ignored: /(^|[\/\\])\../, // ignore dotfiles
-                persistent: true,
-                awaitWriteFinish: {
-                  stabilityThreshold: 100,
-                  pollInterval: 100
-                }
+              watchPaths.forEach(path => {
+                server.watcher.add(path)
               })
 
-              watcher.on('ready', () => {
-                Logger.debug('File watcher active and listening')
-              })
-
-              watcher.on('all', async (event: string, filePath: string) => {
+              // handle file system events
+              const handleFileChange = async (filePath: string, event: 'add' | 'unlink' | 'addDir' | 'unlinkDir') => {
                 // filter for relevant file extensions
                 const isRelevantFile = driver.extensions.some(ext => filePath.endsWith(ext))
-
                 if (!isRelevantFile) {
                   return
                 }
 
-                Logger.debug(`File event: ${event} - ${relative(srcDir, filePath)}`)
-
-                if (event === 'add' || event === 'unlink' || event === 'addDir' || event === 'unlinkDir') {
-                  Logger.debug(`Processing ${event}...`)
-                  Logger.debug('Regenerating routes...')
-
-                  // rebuild routes
-                  await updateRoutes()
-
-                  Logger.debug(`Updated routes for ${routesByScope.size} scope(s)`)
-
-                  // invalidate virtual modules
-                  const virtualModules = [
-                    server.moduleGraph.getModuleById(MODULE_ID),
-                    ...Array.from(routesByScope.keys())
-                      .map(scope => server.moduleGraph.getModuleById(`${MODULE_ID}/${scope}`))
-                  ].filter(Boolean)
-
-                  virtualModules.forEach((module: any) => {
-                    if (module) {
-                      server.moduleGraph.invalidateModule(module, new Set(), Date.now(), true)
-                    }
-                  })
-
-                  // trigger full reload
-                  server.ws.send({
-                    type: 'full-reload',
-                    path: '*'
-                  })
+                // check if file is in any pages directory
+                const isInPagesDir = pagesInfos.some(({ path }) => filePath.startsWith(path))
+                if (!isInPagesDir) {
+                  return
                 }
-              })
 
-              watcher.on('error', (error: Error) => {
-                Logger.error(`Watcher error: ${error}`)
-              })
+                Logger.debug(`File event: ${event} - ${relative(root, filePath)}`)
+                Logger.debug(`Processing ${event}...`)
+                Logger.debug('Regenerating routes...')
 
-              // cleanup when server closes
-              server.httpServer?.on('close', () => {
-                Logger.debug('Closing file watcher')
-                watcher.close()
-              })
-            },
+                // rebuild routes
+                await updateRoutes()
 
-            // cleanup when plugin is destroyed
-            buildEnd () {
-              if (watcher) {
-                watcher.close()
-                watcher = null
+                Logger.debug(`Updated routes for ${routesByScope.size} scope(s)`)
+
+                // invalidate virtual modules
+                const virtualModules = [
+                  server.moduleGraph.getModuleById(MODULE_ID),
+                  ...Array.from(routesByScope.keys())
+                    .map(scope => server.moduleGraph.getModuleById(`${MODULE_ID}/${scope}`))
+                ].filter(Boolean)
+
+                virtualModules.forEach((module: any) => {
+                  if (module) {
+                    server.moduleGraph.invalidateModule(module, new Set(), Date.now(), true)
+                  }
+                })
+
+                // trigger full reload
+                server.ws.send({
+                  type: 'full-reload',
+                  path: '*'
+                })
               }
+
+              // listen to Vite's watcher events
+              server.watcher.on('add', (filePath: string) => {
+                handleFileChange(filePath, 'add')
+              })
+
+              server.watcher.on('unlink', (filePath: string) => {
+                handleFileChange(filePath, 'unlink')
+              })
+
+              server.watcher.on('addDir', (filePath: string) => {
+                handleFileChange(filePath, 'addDir')
+              })
+
+              server.watcher.on('unlinkDir', (filePath: string) => {
+                handleFileChange(filePath, 'unlinkDir')
+              })
             }
           })
 
