@@ -1,13 +1,12 @@
 import { relative } from 'node:path'
 import chokidar from 'chokidar'
 import pc from 'picocolors'
+import 'wxt'
 import { defineWxtModule } from 'wxt/modules'
+import { makeLogger, plural, type LogLevel } from '@davestewart/wxt-utils'
 import { filesToRoutes, type RouteDefinition, routesToCode } from './router/routes'
 import { getPageFiles, getPagesDirs, PagesDirInfo } from './router/fs'
-import { createLogger, type LogLevel } from './helpers/logger'
 import { type PagesDriver, vueDriver } from './drivers'
-import { plural } from './helpers/utils'
-import 'wxt'
 
 export interface PagesModuleOptions {
   /** Driver to use (defaults to vue) */
@@ -42,7 +41,7 @@ export const module = defineWxtModule<PagesModuleOptions>({
     const srcDir = wxt.config.srcDir
 
     // logging
-    const Logger = createLogger(wxt, 'pages', options.logLevel)
+    const Logger = makeLogger(wxt.logger, 'pages', options.logLevel)
 
     // all source folders (main and layers)
     const sourceDirs = [

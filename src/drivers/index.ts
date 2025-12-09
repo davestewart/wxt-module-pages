@@ -1,5 +1,4 @@
 import { RouteDefinition } from '../router/routes'
-import { pascalCase } from '../helpers/utils'
 
 export interface PagesDriver {
   /**
@@ -386,4 +385,15 @@ ${routeStrings.join(',\n')}
       return `// not supported yet`
     }
   }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// utils
+// ---------------------------------------------------------------------------------------------------------------------
+
+export function pascalCase (str: string) {
+  return str
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join('')
 }
