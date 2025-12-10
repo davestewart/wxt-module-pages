@@ -2,7 +2,7 @@ import { relative } from 'node:path'
 import pc from 'picocolors'
 import { defineWxtModule } from 'wxt/modules'
 import { type LogLevel, makeLogger, plural } from '@davestewart/wxt-utils'
-import { filesToRoutes, type RouteDefinition, routesToCode } from './router/routes'
+import { filesToRoutes, RouteDefinition, routesToCode } from './router/routes'
 import 'wxt'
 import { getPageFiles, getPagesDirs, PagesDirInfo } from './router/fs'
 import { type PagesDriver, vueDriver } from './drivers'
@@ -326,7 +326,7 @@ export const module = defineWxtModule<PagesModuleOptions>({
           server.watcher.on('unlink', (filePath: string) => {
             handleFileChange(filePath, 'unlink')
           })
-        }
+        },
       }
     }
 

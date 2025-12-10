@@ -10,7 +10,7 @@ export interface RouteDefinition {
   layout?: string
 }
 
-export interface FileNode {
+interface FileNode {
   absPath: string
   relPath: string
   isLayout: boolean
