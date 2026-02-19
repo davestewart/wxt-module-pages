@@ -2,6 +2,8 @@
 
 > File-system based routing for WXT browser extensions
 
+![Splash](splash.png)
+
 ## Abstract
 
 ### Overview
@@ -10,10 +12,12 @@ WXT Pages brings file-based routing to [WXT](https://wxt.dev):
 
 ```yaml
 /pages
+  /+layout.vue      → Wrapper component for all pages
   /index.vue        → /
-  /about.vue        → /about 
-  /contact.vue      → /contact
-  /items
+  (marketing)/
+    /about.vue      → /about 
+    /contact.vue    → /contact
+  /users
     /[id].vue       → /items/:id
     /[id]
       /edit.vue     → /items/:id/edit
@@ -414,7 +418,7 @@ import { global, popup, options } from 'wxt-module-pages:routes'
 Here's a complete example showing all conventions:
 
 ```yaml
-entrypoints/popup/pages/
+pages/
   index.vue                        → / (name: 'index')
   about.vue                        → /about (name: 'about')
 
